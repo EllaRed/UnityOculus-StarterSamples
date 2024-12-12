@@ -20,5 +20,6 @@ public class DataBlock : MonoBehaviour
     }
     void Start() {
         //gameObject.tag = "DataBlock";
+        ObjectSpawnManager.Instance.NotifyObjectSpawned(gameObject);
     }
 }

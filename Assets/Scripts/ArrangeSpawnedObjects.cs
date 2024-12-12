@@ -1,5 +1,6 @@
 using UnityEngine;
 using System.Collections.Generic;
+using Sirenix.OdinInspector;
 
 public class ArrangeSpawnedObjects : MonoBehaviour
 {
@@ -7,7 +8,7 @@ public class ArrangeSpawnedObjects : MonoBehaviour
     {
         DataBlock,
         ServerPlatform
-        
+
     }
 
     public enum ArrangeSide
@@ -19,7 +20,7 @@ public class ArrangeSpawnedObjects : MonoBehaviour
     [Header("Configuration")]
     public ObjectTag objectTag = ObjectTag.DataBlock;
     public ArrangeSide arrangeSide = ArrangeSide.Left;
-    
+
     [Header("Layout Settings")]
     [SerializeField] private int _maxObjectsPerRow = 3;
     [SerializeField] private float _laptopSpaceWidth = 0.5f; // Configurable space for laptop
@@ -27,7 +28,28 @@ public class ArrangeSpawnedObjects : MonoBehaviour
 
     private List<GameObject> objectsToArrange = new List<GameObject>();
 
-    public void FindAndArrangeObjects()
+    private void OnEnable()
+    {
+        ObjectSpawnManager.Instance.OnObjectSpawned.AddListener(HandleNewObjectSpawned);
+    }
+
+    private void OnDisable()
+    {
+        ObjectSpawnManager.Instance.OnObjectSpawned.RemoveListener(HandleNewObjectSpawned);
+    }
+
+    public void HandleNewObjectSpawned(GameObject newObject)
+    {
+        // Only handle objects with matching tag
+        if (newObject.CompareTag(objectTag.ToString()) && !objectsToArrange.Contains(newObject))
+        {
+            objectsToArrange.Add(newObject);
+            ArrangeAllObjects();
+        }
+    }
+
+    [Button("Arrange All Objects")]
+    public void ArrangeAllObjects()
     {
         objectsToArrange.Clear();
         string tagToSearch = objectTag.ToString();
@@ -41,7 +63,7 @@ public class ArrangeSpawnedObjects : MonoBehaviour
             return;
         }
 
-        Renderer tableRenderer = table.GetComponent<Renderer>();
+        Renderer tableRenderer = table.GetComponentInChildren<Renderer>();
         if (tableRenderer == null)
         {
             Debug.LogWarning("Table does not have a Renderer component!");
@@ -53,42 +75,50 @@ public class ArrangeSpawnedObjects : MonoBehaviour
 
     private void ArrangeObjectsOnTable(Bounds tableBounds)
     {
-        if (objectsToArrange.Count == 0)
+        if (objectsToArrange.Count == 0) return;
+
+        float objectSpacing = 0.3f;
+        int objectsPerRow = 3;
+
+        Dictionary<GameObject, (Rigidbody rb, bool wasKinematic)> rigidbodyStates = new();
+
+        foreach (var obj in objectsToArrange)
         {
-            Debug.LogWarning("No objects to arrange!");
-            return;
+            obj.transform.SetParent(null);
+            if (obj.TryGetComponent<Rigidbody>(out var rb))
+            {
+                rigidbodyStates[obj] = (rb, rb.isKinematic);
+                rb.isKinematic = true;
+            }
         }
 
-        // Calculate rows needed
-        int totalRows = Mathf.CeilToInt((float)objectsToArrange.Count / _maxObjectsPerRow);
-        
-        // Calculate spacing
-        float objectSpacingX = tableBounds.size.x * 0.15f; // Space between objects horizontally
-        float objectSpacingZ = tableBounds.size.z * 0.15f; // Space between rows
-        
-        // Calculate start position
-        float startX = arrangeSide == ArrangeSide.Left 
-            ? tableBounds.center.x - _laptopSpaceWidth - _insetFromEdge
-            : tableBounds.center.x + _insetFromEdge;
-
-        float startZ = tableBounds.center.z + (objectSpacingZ * (totalRows - 1) / 2);
-
-        for (int i = 0; i < objectsToArrange.Count; i++)
+        try
         {
-            int row = i / _maxObjectsPerRow;
-            int col = i % _maxObjectsPerRow;
+            // Calculate starting X position based on side
+            float startX = arrangeSide == ArrangeSide.Left
+                ? tableBounds.min.x + 0.3f                     // Left side
+                : tableBounds.center.x + (objectSpacing * 0.5f); // Right side
 
-            // Calculate position for this object
-            float xPos = startX + (col * objectSpacingX);
-            float zPos = startZ - (row * objectSpacingZ);
-            
-            Vector3 newPosition = new Vector3(
-                xPos,
-                tableBounds.center.y,
-                zPos
-            );
+            for (int i = 0; i < objectsToArrange.Count; i++)
+            {
+                int row = i / objectsPerRow;
+                int col = i % objectsPerRow;
 
-            objectsToArrange[i].transform.position = newPosition;
+                Vector3 newPosition = new Vector3(
+                    startX + (col * objectSpacing),    // X: Based on side + column offset
+                    tableBounds.max.y + 0.05f,         // Y: Slightly above table
+                    tableBounds.max.z - 0.3f - (row * objectSpacing)  // Z: Back to front
+                );
+
+                objectsToArrange[i].transform.position = newPosition;
+            }
+        }
+        finally
+        {
+            foreach (var kvp in rigidbodyStates)
+            {
+                kvp.Value.rb.isKinematic = kvp.Value.wasKinematic;
+            }
         }
     }
 }
