@@ -62,10 +62,10 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/Cloud Architect.unity
     guid: 1ef7e9d4d10e0184bb747f181d99b79d
-  - enabled: 1
+  - enabled: 0
     path: Assets/Samples/Meta MR Utility Kit/71.0.0/Scene Decorator/SceneDecorator.unity
     guid: 74ec1332800b4dd44915943d3bd65e1e
-  - enabled: 1
+  - enabled: 0
     path: Assets/Samples/Meta MR Utility Kit/71.0.0/Bouncing Ball/BouncingBall.unity
     guid: 8f96b0c0fd5605a4f8477abdb8e65436
   m_configObjects:

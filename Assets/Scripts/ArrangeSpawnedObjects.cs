@@ -8,7 +8,6 @@ public class ArrangeSpawnedObjects : MonoBehaviour
     {
         DataBlock,
         ServerPlatform
-
     }
 
     public enum ArrangeSide
@@ -23,8 +22,12 @@ public class ArrangeSpawnedObjects : MonoBehaviour
 
     [Header("Layout Settings")]
     [SerializeField] private int _maxObjectsPerRow = 3;
-    [SerializeField] private float _laptopSpaceWidth = 0.5f; // Configurable space for laptop
-    [SerializeField] private float _insetFromEdge = 0.25f; // How far from edge to start arranging
+    [SerializeField] private float _insetFromEdge = 0.25f;
+
+    [Header("Spacing Settings")]
+    [SerializeField] private float _spacingMultiplier = 1.2f; // Multiplier for space between objects
+    [SerializeField] private float _minimumSpacing = 0.3f; // Minimum space between objects
+    [SerializeField] private float _heightOffset = 0.05f; // Height above table
 
     private List<GameObject> objectsToArrange = new List<GameObject>();
 
@@ -40,12 +43,33 @@ public class ArrangeSpawnedObjects : MonoBehaviour
 
     public void HandleNewObjectSpawned(GameObject newObject)
     {
-        // Only handle objects with matching tag
         if (newObject.CompareTag(objectTag.ToString()) && !objectsToArrange.Contains(newObject))
         {
             objectsToArrange.Add(newObject);
             ArrangeAllObjects();
         }
+    }
+
+    private Bounds GetObjectBounds(GameObject obj)
+    {
+        // Get all renderers (including children)
+        Renderer[] renderers = obj.GetComponentsInChildren<Renderer>();
+        if (renderers.Length == 0)
+        {
+            // Fallback to object's transform if no renderers found
+            return new Bounds(obj.transform.position, Vector3.one * 0.2f);
+        }
+
+        // Start with the first renderer's bounds
+        Bounds bounds = renderers[0].bounds;
+
+        // Encapsulate all other renderers
+        for (int i = 1; i < renderers.Length; i++)
+        {
+            bounds.Encapsulate(renderers[i].bounds);
+        }
+
+        return bounds;
     }
 
     [Button("Arrange All Objects")]
@@ -77,8 +101,22 @@ public class ArrangeSpawnedObjects : MonoBehaviour
     {
         if (objectsToArrange.Count == 0) return;
 
-        float objectSpacing = 0.3f;
-        int objectsPerRow = 3;
+        // Calculate maximum bounds for spacing
+        float maxWidth = 0f;
+        float maxDepth = 0f;
+        Dictionary<GameObject, Bounds> objectBounds = new Dictionary<GameObject, Bounds>();
+
+        foreach (var obj in objectsToArrange)
+        {
+            var bounds = GetObjectBounds(obj);
+            objectBounds[obj] = bounds;
+            maxWidth = Mathf.Max(maxWidth, bounds.size.x);
+            maxDepth = Mathf.Max(maxDepth, bounds.size.z);
+        }
+
+        // Calculate spacing based on largest object
+        float objectSpacing = Mathf.Max(_minimumSpacing,
+            Mathf.Max(maxWidth, maxDepth) * _spacingMultiplier);
 
         Dictionary<GameObject, (Rigidbody rb, bool wasKinematic)> rigidbodyStates = new();
 
@@ -96,21 +134,26 @@ public class ArrangeSpawnedObjects : MonoBehaviour
         {
             // Calculate starting Z position based on side
             float startZ = arrangeSide == ArrangeSide.Left
-                ? tableBounds.min.z + 0.3f                     // Left side
-                : tableBounds.center.z + (objectSpacing * 0.5f); // Right side
+                ? tableBounds.min.z + _insetFromEdge + (maxDepth / 2)
+                : tableBounds.center.z + (objectSpacing * 0.5f);
 
             for (int i = 0; i < objectsToArrange.Count; i++)
             {
-                int row = i / objectsPerRow;
-                int col = i % objectsPerRow;
+                int row = i / _maxObjectsPerRow;
+                int col = i % _maxObjectsPerRow;
 
+                GameObject obj = objectsToArrange[i];
+                Bounds objBounds = objectBounds[obj];
+
+                // Calculate position with offset based on object's own bounds
                 Vector3 newPosition = new Vector3(
-                    tableBounds.min.x + 0.3f + (row * objectSpacing),  // X: Back to front
-                    tableBounds.max.y + 0.05f,                         // Y: Slightly above table
-                    startZ + (col * objectSpacing)                     // Z: Based on side + column offset
+                    tableBounds.min.x + _insetFromEdge + (row * objectSpacing) + (objBounds.size.x / 2),
+                    tableBounds.max.y + _heightOffset + (objBounds.size.y / 2),
+                    startZ + (col * objectSpacing)
                 );
 
-                objectsToArrange[i].transform.position = newPosition;
+                // Smoothly move object to new position
+                obj.transform.position = newPosition;
             }
         }
         finally
@@ -118,6 +161,34 @@ public class ArrangeSpawnedObjects : MonoBehaviour
             foreach (var kvp in rigidbodyStates)
             {
                 kvp.Value.rb.isKinematic = kvp.Value.wasKinematic;
+            }
+        }
+    }
+
+    private void OnDrawGizmosSelected()
+    {
+        // Visualize the arrangement area
+        if (objectsToArrange.Count > 0)
+        {
+            GameObject table = GameObject.Find("TABLE");
+            if (table != null)
+            {
+                Renderer tableRenderer = table.GetComponentInChildren<Renderer>();
+                if (tableRenderer != null)
+                {
+                    Bounds tableBounds = tableRenderer.bounds;
+                    Gizmos.color = Color.yellow;
+
+                    // Draw the arrangement area
+                    float width = _maxObjectsPerRow * _minimumSpacing;
+                    float depth = (objectsToArrange.Count / _maxObjectsPerRow + 1) * _minimumSpacing;
+
+                    Vector3 center = arrangeSide == ArrangeSide.Left
+                        ? new Vector3(tableBounds.min.x + depth / 2, tableBounds.max.y + _heightOffset, tableBounds.min.z + width / 2)
+                        : new Vector3(tableBounds.min.x + depth / 2, tableBounds.max.y + _heightOffset, tableBounds.center.z + width / 2);
+
+                    Gizmos.DrawWireCube(center, new Vector3(depth, 0.1f, width));
+                }
             }
         }
     }

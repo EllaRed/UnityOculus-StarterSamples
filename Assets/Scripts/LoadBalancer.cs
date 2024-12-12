@@ -13,12 +13,12 @@ public class LoadBalancer : MonoBehaviour
 
     private void OnEnable()
     {
-      //  ObjectSpawnManager.Instance.OnObjectSpawned.AddListener(HandleNewObjectSpawned);
+      ObjectSpawnManager.Instance.OnObjectSpawned.AddListener(HandleNewObjectSpawned);
     }
 
     private void OnDisable()
     {
-        //ObjectSpawnManager.Instance.OnObjectSpawned.RemoveListener(HandleNewObjectSpawned);
+        ObjectSpawnManager.Instance.OnObjectSpawned.RemoveListener(HandleNewObjectSpawned);
     }
 
     public void HandleNewObjectSpawned(GameObject newObject)
