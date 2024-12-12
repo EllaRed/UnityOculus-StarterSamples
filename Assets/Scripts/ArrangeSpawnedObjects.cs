@@ -94,10 +94,10 @@ public class ArrangeSpawnedObjects : MonoBehaviour
 
         try
         {
-            // Calculate starting X position based on side
-            float startX = arrangeSide == ArrangeSide.Left
-                ? tableBounds.min.x + 0.3f                     // Left side
-                : tableBounds.center.x + (objectSpacing * 0.5f); // Right side
+            // Calculate starting Z position based on side
+            float startZ = arrangeSide == ArrangeSide.Left
+                ? tableBounds.min.z + 0.3f                     // Left side
+                : tableBounds.center.z + (objectSpacing * 0.5f); // Right side
 
             for (int i = 0; i < objectsToArrange.Count; i++)
             {
@@ -105,9 +105,9 @@ public class ArrangeSpawnedObjects : MonoBehaviour
                 int col = i % objectsPerRow;
 
                 Vector3 newPosition = new Vector3(
-                    startX + (col * objectSpacing),    // X: Based on side + column offset
-                    tableBounds.max.y + 0.05f,         // Y: Slightly above table
-                    tableBounds.max.z - 0.3f - (row * objectSpacing)  // Z: Back to front
+                    tableBounds.min.x + 0.3f + (row * objectSpacing),  // X: Back to front
+                    tableBounds.max.y + 0.05f,                         // Y: Slightly above table
+                    startZ + (col * objectSpacing)                     // Z: Based on side + column offset
                 );
 
                 objectsToArrange[i].transform.position = newPosition;
